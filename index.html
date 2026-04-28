@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Kandidattest: Weight & Importance Lab</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; max-width: 1300px; margin: auto; padding: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 25px; }
+        h1 { color: #2c3e50; border-bottom: 3px solid #e74c3c; padding-bottom: 10px; }
+        
+        table { border-collapse: collapse; width: 100%; margin: 15px 0; background: #fff; font-size: 0.82em; table-layout: fixed; }
+        th, td { border: 1px solid #dfe1e5; padding: 10px 2px; text-align: center; vertical-align: middle; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        
+        #responseMatrix th:first-child, #responseMatrix td:first-child { width: 180px; text-align: left; padding-left: 15px; font-weight: bold; background: #fff; position: sticky; left: 0; z-index: 2; border-right: 2px solid #ddd; }
+
+        .weight-input { width: 45px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #e74c3c; }
+        .user-input { width: 30px; height: 30px; text-align: center; border: 1px solid rgba(255,255,255,0.5); border-radius: 4px; font-weight: bold; background: rgba(255,255,255,0.3); color: inherit; outline: none; }
+        
+        .imp-select { width: 35px; background: rgba(255,255,255,0.8); border: 1px solid #ccc; border-radius: 3px; cursor: pointer; font-size: 0.9em; }
+
+        .control-group { background: #fff4e5; padding: 20px; border-radius: 8px; border: 1px solid #ffa000; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; }
+        .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+        .candidate-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .top-match { border: 2px solid #e74c3c; background: #fdf2f2; transform: scale(1.03); z-index: 5; }
+        .score-badge { background: #2c3e50; color: white; padding: 4px 10px; border-radius: 15px; font-weight: bold; font-size: 0.9em; }
+        
+        .btn-group { margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn { color: white; border: none; padding: 10px 18px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-rand { background: #e74c3c; }
+        .btn-default { background: #67da63; }
+        .btn-equal { background: #3498db; }
+        .btn-user { background: #27ae60; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        
+        .user-row { border-bottom: 2px solid #2c3e50; }
+        .imp-row { background: #f4f4f4; color: #555; }
+        .matrix-container { overflow-x: auto; border-radius: 8px; border: 1px solid #ddd; }
+        
+        .heat-1 { background-color: #f7fbff; color: #08306b; }
+        .heat-2 { background-color: #c6dbef; color: #08306b; }
+        .heat-3 { background-color: #6baed6; color: #fff; }
+        .heat-4 { background-color: #2171b5; color: #fff; }
+        .heat-5 { background-color: #08306b; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <h1>Kandidattest: Weight & Importance Lab</h1>
+
+    <div class="card">
+        <h2>1. Weight Matrix Settings</h2>
+        <div class="btn-group">
+            <button class="btn btn-rand" onclick="randomizeWeights()">Randomize Weights</button>
+            <button class="btn btn-equal" onclick="equalizeWeights()">Reset to Standard Gradient</button>
+            <button class="btn btn-default" onclick="initWeights()">Reset to Start Defaults</button>
+        </div>
+        <table id="weightTable">
+            <thead>
+                <tr>
+                    <th style="width: 180px;">Importance</th>
+                    <th>d=0</th><th>d=1</th><th>d=2</th><th>d=3</th><th>d=4</th>
+                </tr>
+            </thead>
+            <tbody id="weightBody"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>2. Robustness Test (Drop Random Questions)</h2>
+        <div class="control-group">
+            <label style="min-width: 200px;"><strong>Questions to remove:</strong></label>
+            <input type="range" id="dropN" min="0" max="19" value="0" style="flex-grow: 1;" oninput="updateUI()">
+            <span id="dropVal" style="font-weight:bold; font-size: 1.8em; color: #e74c3c;">0</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>3. Match Results</h2>
+        <div id="results" class="results-grid"></div>
+    </div>
+
+    <div class="card">
+        <h2>4. Political Response Matrix (12 Parties)</h2>
+        <div class="btn-group">
+            <button class="btn btn-user" onclick="randomizeUser()">Randomize User Profile</button>
+        </div>
+        <div class="matrix-container">
+            <table id="responseMatrix">
+                <thead>
+                    <tr id="matrixHeader"><th>Entity</th></tr>
+                </thead>
+                <tbody id="matrixBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const M = 20; 
+        const ENFORCED_MAX_DIST = 720; 
+
+        const partiesData = [
+            { name: "Enhedslisten (Ø)", base: [1,1,1,1,1,1,1,1,1,1,2,1,1,2,1,2,1,1,1,2] },
+            { name: "Alternativet (Å)", base: [1,1,2,1,1,2,1,2,1,1,1,1,2,1,2,1,2,1,2,1] },
+            { name: "SF (F)", base: [2,2,1,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1,2,2] },
+            { name: "Socialdemokratiet (A)", base: [3,3,2,3,3,3,2,3,3,4,3,3,3,3,3,3,3,3,3,3] },
+            { name: "Radikale Venstre (B)", base: [2,1,3,2,2,2,3,1,3,1,2,2,3,2,3,2,2,1,2,2] },
+            { name: "Moderaterne (M)", base: [3,2,3,3,3,2,3,3,4,2,3,3,3,3,3,2,3,2,3,3] },
+            { name: "Venstre (V)", base: [4,4,4,4,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4] },
+            { name: "Konservative (C)", base: [4,5,4,4,4,4,4,4,4,5,4,4,4,4,4,5,4,4,4,5] },
+            { name: "Liberal Alliance (I)", base: [5,1,5,5,5,1,5,5,5,1,5,1,5,5,5,1,5,1,5,5] },
+            { name: "Dansk Folkeparti (O)", base: [3,5,2,5,4,5,2,5,1,5,3,5,2,5,5,5,2,5,1,5] },
+            { name: "Danmarksdemokraterne (Æ)", base: [4,5,3,5,4,5,3,5,4,5,4,5,3,5,4,5,3,5,4,5] },
+            { name: "Borgernes Parti (D)", base: [5,5,2,5,5,5,2,5,1,5,5,5,2,5,5,5,1,5,1,5] }
+        ];
+
+        let userAnswers = [];
+        let userImportance = [];
+
+        function initWeights() {
+            const body = document.getElementById('weightBody');
+            const labels = ["Not Important", "Neutral", "Important"];
+            const defaults = [[12,15,18,21,24], [6,12,18,24,30], [0,9,18,27,36]];
+            body.innerHTML = '';
+            for(let r=0; r<3; r++) {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `<td>${labels[r]}</td>` + 
+                    defaults[r].map((v, c) => `<td><input type="number" class="weight-input" data-row="${r}" data-col="${c}" value="${v}" min="0" max="36" oninput="updateUI()"></td>`).join('');
+                body.appendChild(tr);
+            }
+        }
+
+        function randomizeWeights() {
+            document.querySelectorAll('.weight-input').forEach(input => {
+                input.value = Math.floor(Math.random() * 37);
+            });
+            updateUI();
+        }
+
+        function equalizeWeights() {
+            document.querySelectorAll('.weight-input').forEach(input => {
+                input.value = parseInt(input.dataset.col) * 9;
+            });
+            updateUI();
+        }
+
+        function buildMatrix() {
+            const header = document.getElementById('matrixHeader');
+            header.innerHTML = '<th>Entity</th>';
+            for(let i=1; i<=M; i++) {
+                const th = document.createElement('th'); th.innerText = 'Q' + i;
+                header.appendChild(th);
+            }
+            const body = document.getElementById('matrixBody');
+            body.innerHTML = '';
+
+            const userRow = document.createElement('tr');
+            userRow.className = 'user-row';
+            userRow.innerHTML = `<td>User Answers</td>` + userAnswers.map((a, i) => 
+                `<td id="user-cell-${i}" class="heat-${a}"><input type="number" class="user-input" value="${a}" min="1" max="5" oninput="updateUserAnswer(${i}, this)"></td>`
+            ).join('');
+            body.appendChild(userRow);
+
+            const impRow = document.createElement('tr');
+            impRow.className = 'imp-row';
+            impRow.innerHTML = `<td>Importance</td>` + userImportance.map((v, i) => 
+                `<td><select class="imp-select" onchange="updateUserImp(${i}, this)">
+                    <option value="0" ${v==0?'selected':''}>Not Important</option>
+                    <option value="1" ${v==1?'selected':''}>Neutral</option>
+                    <option value="2" ${v==2?'selected':''}>Important</option>
+                </select></td>`
+            ).join('');
+            body.appendChild(impRow);
+
+            partiesData.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${p.name}</td>` + p.base.map(a => `<td class="heat-${a}">${a}</td>`).join('');
+                body.appendChild(tr);
+            });
+        }
+
+        function updateUserAnswer(idx, input) {
+            let val = parseInt(input.value);
+            if (val >= 1 && val <= 5) {
+                userAnswers[idx] = val;
+                document.getElementById(`user-cell-${idx}`).className = `heat-${val}`;
+                updateUI();
+            }
+        }
+
+        function updateUserImp(idx, select) {
+            userImportance[idx] = parseInt(select.value);
+            updateUI();
+        }
+
+        function randomizeUser() {
+            userAnswers = Array.from({length: M}, () => Math.floor(Math.random() * 5) + 1);
+            userImportance = Array.from({length: M}, () => Math.floor(Math.random() * 3));
+            buildMatrix();
+            updateUI();
+        }
+
+        function updateUI() {
+            const weightEls = document.querySelectorAll('.weight-input');
+            const currentWeights = [[], [], []];
+            weightEls.forEach(input => {
+                let val = Math.min(36, Math.max(0, parseInt(input.value) || 0));
+                currentWeights[input.dataset.row][input.dataset.col] = val;
+            });
+
+            const dropN = parseInt(document.getElementById('dropN').value);
+            document.getElementById('dropVal').innerText = dropN;
+
+            let indices = Array.from({length: M}, (_, i) => i);
+            for (let i = indices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [indices[i], indices[j]] = [indices[j], indices[i]];
+            }
+            const activeQuestions = indices.slice(0, M - dropN);
+
+            const scores = partiesData.map(party => {
+                let totalDist = 0;
+                activeQuestions.forEach(idx => {
+                    const d = Math.abs(userAnswers[idx] - party.base[idx]);
+                    const impLevel = userImportance[idx];
+                    totalDist += currentWeights[impLevel][d];
+                });
+                const disagreement = Math.ceil(100 * (totalDist / ENFORCED_MAX_DIST));
+                let agreement = Math.max(0, 100 - disagreement);
+                return { name: party.name, agreement };
+            }).sort((a, b) => b.agreement - a.agreement);
+
+            const container = document.getElementById('results');
+            container.innerHTML = '';
+            scores.forEach((res, i) => {
+                const div = document.createElement('div');
+                div.className = 'candidate-item' + (i === 0 ? ' top-match' : '');
+                div.innerHTML = `<div><div style="font-size:0.65em; color:#888;">RANK #${i+1}</div>
+                                 <div style="font-weight:bold; font-size:0.9em;">${res.name}</div></div>
+                                 <div class="score-badge">${res.agreement}%</div>`;
+                container.appendChild(div);
+            });
+        }
+
+        initWeights();
+        randomizeUser();
+    </script>
+</body>
+</html>
