@@ -4,27 +4,26 @@
     <meta charset="UTF-8">
     <title>Kandidattest: Weight & Importance Lab</title>
     <style>
+        /* General Layout */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; max-width: 1300px; margin: auto; padding: 20px; background: #f0f2f5; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 25px; }
         h1 { color: #2c3e50; border-bottom: 3px solid #e74c3c; padding-bottom: 10px; }
         
+        /* Table Styling */
         table { border-collapse: collapse; width: 100%; margin: 15px 0; background: #fff; font-size: 0.82em; table-layout: fixed; }
         th, td { border: 1px solid #dfe1e5; padding: 10px 2px; text-align: center; vertical-align: middle; }
         th { background-color: #f8f9fa; font-weight: 600; }
         
+        /* Sticky Column for Party Names */
         #responseMatrix th:first-child, #responseMatrix td:first-child { width: 180px; text-align: left; padding-left: 15px; font-weight: bold; background: #fff; position: sticky; left: 0; z-index: 2; border-right: 2px solid #ddd; }
 
+        /* Input Styling */
         .weight-input { width: 45px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #e74c3c; }
-        .user-input { width: 30px; height: 30px; text-align: center; border: 1px solid rgba(255,255,255,0.5); border-radius: 4px; font-weight: bold; background: rgba(255,255,255,0.3); color: inherit; outline: none; }
-        
+        .user-input { width: 30px; height: 30px; text-align: center; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; font-weight: bold; background: rgba(255,255,255,0.6); color: inherit; outline: none; }
         .imp-select { width: 35px; background: rgba(255,255,255,0.8); border: 1px solid #ccc; border-radius: 3px; cursor: pointer; font-size: 0.9em; }
 
+        /* Controls & Buttons */
         .control-group { background: #fff4e5; padding: 20px; border-radius: 8px; border: 1px solid #ffa000; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; }
-        .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-        .candidate-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .top-match { border: 2px solid #e74c3c; background: #fdf2f2; transform: scale(1.03); z-index: 5; }
-        .score-badge { background: #2c3e50; color: white; padding: 4px 10px; border-radius: 15px; font-weight: bold; font-size: 0.9em; }
-        
         .btn-group { margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
         .btn { color: white; border: none; padding: 10px 18px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .btn-rand { background: #e74c3c; }
@@ -33,10 +32,20 @@
         .btn-user { background: #27ae60; }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
         
+        /* Results Section */
+        .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+        .candidate-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .top-match { border: 2px solid #e74c3c; background: #fdf2f2; transform: scale(1.03); z-index: 5; }
+        .score-badge { background: #2c3e50; color: white; padding: 4px 10px; border-radius: 15px; font-weight: bold; font-size: 0.9em; }
+        
+        /* Matrix Container & Heatmap */
         .user-row { border-bottom: 2px solid #2c3e50; }
         .imp-row { background: #f4f4f4; color: #555; }
         .matrix-container { overflow-x: auto; border-radius: 8px; border: 1px solid #ddd; }
-        
+        .info-box { background: #f8f9fa; border-left: 5px solid #3498db; padding: 15px; margin-top: 10px; font-size: 0.9em; }
+        .dist-label { font-weight: bold; color: #e74c3c; }
+
+        /* Heatmap Colors */
         .heat-1 { background-color: #f7fbff; color: #08306b; }
         .heat-2 { background-color: #c6dbef; color: #08306b; }
         .heat-3 { background-color: #6baed6; color: #fff; }
@@ -55,15 +64,28 @@
             <button class="btn btn-equal" onclick="equalizeWeights()">Reset to Standard Gradient</button>
             <button class="btn btn-default" onclick="initWeights()">Reset to Start Defaults</button>
         </div>
+        
         <table id="weightTable">
             <thead>
                 <tr>
                     <th style="width: 180px;">Importance</th>
-                    <th>d=0</th><th>d=1</th><th>d=2</th><th>d=3</th><th>d=4</th>
+                    <th>Score 1</th><th>Score 2</th><th>Score 3</th><th>Score 4</th><th>Score 5</th>
                 </tr>
             </thead>
             <tbody id="weightBody"></tbody>
         </table>
+
+        <div class="info-box">
+            <strong>The Scoring Shift (1-5 Disagreement Scale):</strong>
+            <p>The calculation uses the distance between user and party answers. The matrix above sets the "penalty points" for each level of disagreement.</p>
+            <ul>
+                <li><span class="dist-label">Score 1:</span> Perfect Match (Distance 0).</li>
+                <li><span class="dist-label">Score 2:</span> Slight Disagreement (Distance 1).</li>
+                <li><span class="dist-label">Score 3:</span> Moderate Disagreement (Distance 2).</li>
+                <li><span class="dist-label">Score 4:</span> Strong Disagreement (Distance 3).</li>
+                <li><span class="dist-label">Score 5:</span> Total Opposites (Distance 4).</li>
+            </ul>
+        </div>
     </div>
 
     <div class="card">
@@ -130,20 +152,6 @@
             }
         }
 
-        function randomizeWeights() {
-            document.querySelectorAll('.weight-input').forEach(input => {
-                input.value = Math.floor(Math.random() * 37);
-            });
-            updateUI();
-        }
-
-        function equalizeWeights() {
-            document.querySelectorAll('.weight-input').forEach(input => {
-                input.value = parseInt(input.dataset.col) * 9;
-            });
-            updateUI();
-        }
-
         function buildMatrix() {
             const header = document.getElementById('matrixHeader');
             header.innerHTML = '<th>Entity</th>';
@@ -179,30 +187,11 @@
             });
         }
 
-        function updateUserAnswer(idx, input) {
-            let val = parseInt(input.value);
-            if (val >= 1 && val <= 5) {
-                userAnswers[idx] = val;
-                document.getElementById(`user-cell-${idx}`).className = `heat-${val}`;
-                updateUI();
-            }
-        }
-
-        function updateUserImp(idx, select) {
-            userImportance[idx] = parseInt(select.value);
-            updateUI();
-        }
-
-        function randomizeUser() {
-            userAnswers = Array.from({length: M}, () => Math.floor(Math.random() * 5) + 1);
-            userImportance = Array.from({length: M}, () => Math.floor(Math.random() * 3));
-            buildMatrix();
-            updateUI();
-        }
-
         function updateUI() {
             const weightEls = document.querySelectorAll('.weight-input');
             const currentWeights = [[], [], []];
+            if (weightEls.length === 0) return;
+
             weightEls.forEach(input => {
                 let val = Math.min(36, Math.max(0, parseInt(input.value) || 0));
                 currentWeights[input.dataset.row][input.dataset.col] = val;
@@ -242,6 +231,42 @@
             });
         }
 
+        function randomizeWeights() {
+            document.querySelectorAll('.weight-input').forEach(input => {
+                input.value = Math.floor(Math.random() * 37);
+            });
+            updateUI();
+        }
+
+        function equalizeWeights() {
+            document.querySelectorAll('.weight-input').forEach(input => {
+                input.value = parseInt(input.dataset.col) * 9;
+            });
+            updateUI();
+        }
+
+        function updateUserAnswer(idx, input) {
+            let val = parseInt(input.value);
+            if (val >= 1 && val <= 5) {
+                userAnswers[idx] = val;
+                document.getElementById(`user-cell-${idx}`).className = `heat-${val}`;
+                updateUI();
+            }
+        }
+
+        function updateUserImp(idx, select) {
+            userImportance[idx] = parseInt(select.value);
+            updateUI();
+        }
+
+        function randomizeUser() {
+            userAnswers = Array.from({length: M}, () => Math.floor(Math.random() * 5) + 1);
+            userImportance = Array.from({length: M}, () => Math.floor(Math.random() * 3));
+            buildMatrix();
+            updateUI();
+        }
+
+        // AUTO-RANDOMIZE ON LOAD
         initWeights();
         randomizeUser();
     </script>
